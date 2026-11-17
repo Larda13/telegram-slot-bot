@@ -1,29 +1,44 @@
 import asyncio
 import logging
-import random
 import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from threading import Thread
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# Loglama ayarları
+# --- 1. RENDER İÇİN MİNİ WEB SUNUCUSU (PORT DOLDURUCU) ---
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), SimpleHandler)
+    server.serve_forever()
+
+# Web sunucusunu ayrı bir arka plan thread'inde başlatıyoruz (Asenkronu bozmasın diye)
+t = Thread(target=run_web_server)
+t.daemon = True
+t.start()
+
+# --- 2. TELEGRAM BOT AYARLARI ---
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
 
-# Oyuncuların bakiyelerini tutacağımız hafıza (Sözlük)
 user_data_db = {}
 
-# Telegram slot (🎰) kazanan değerleri ve çarpanları
 WINNING_VALUES = {
-    1: {"name": "🍒 ÜÇLÜ BAR", "multiplier": 5},      # Bahsin 5 katı
-    22: {"name": "🍇 ÜÇLÜ ÜZÜM", "multiplier": 10},  # Bahsin 10 katı
-    43: {"name": "🍋 ÜÇLÜ LİMON", "multiplier": 15}, # Bahsin 15 katı
-    64: {"name": "🎰 JACKPOT (777)", "multiplier": 50} # Bahsin 50 katı
+    1: {"name": "🍒 ÜÇLÜ BAR", "multiplier": 5},
+    22: {"name": "🍇 ÜÇLÜ ÜZÜM", "multiplier": 10},
+    43: {"name": "🍋 ÜÇLÜ LİMON", "multiplier": 15},
+    64: {"name": "🎰 JACKPOT (777)", "multiplier": 50}
 }
 
 def get_user(user_id):
-    """Kullanıcı veritabanında yoksa başlangıç bakiyesiyle (100 Coin) ekle"""
     if user_id not in user_data_db:
         user_data_db[user_id] = {"balance": 100}
     return user_data_db[user_id]
@@ -49,7 +64,6 @@ async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def gunluk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
-    # Basitlik olması açısından direkt ekliyoruz
     data['balance'] += 50
     await update.message.reply_text(f"🎁 Günlük ödülün alındı! +50 Coin.\n💰 Yeni Bakiyen: **{data['balance']} Coin**", parse_mode="Markdown")
 
@@ -66,7 +80,6 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
 
-    # Bahis miktarını kontrol et
     if not context.args:
         await update.message.reply_text("⚠️ Lütfen bir bahis miktarı gir. Örnek: `/slot 10`", parse_mode="Markdown")
         return
@@ -85,14 +98,10 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Yetersiz bakiye! Mevcut bakiyen: {data['balance']} Coin", parse_mode="Markdown")
         return
 
-    # Bakiyeden bahsi düş
     data['balance'] -= bet
-
-    # Telegram'ın resmi animasyonlu slot zarını at
     msg = await update.message.reply_dice(emoji="🎰")
     slot_value = msg.dice.value
 
-    # Kısa bir bekleme (zar animasyonu tamamlansın diye)
     await asyncio.sleep(2)
 
     if slot_value in WINNING_VALUES:
@@ -112,8 +121,8 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(result_text, parse_mode="Markdown")
 
-    if __name__ == "__main__":
-        TOKEN = os.getenv("TOKEN")
+if __name__ == "__main__":
+    TOKEN = os.getenv("TOKEN")
     
     async def main():
         application = ApplicationBuilder().token(TOKEN).build()
@@ -124,9 +133,12 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         application.add_handler(CommandHandler("iflasiyasa", iflasiyasa))
         application.add_handler(CommandHandler("slot", play_slot))
         
-        print("Ekonomili Slot Botu çalışıyor...")
+        print("Ekonomili Slot Botu başlatılıyor...")
         await application.initialize()
         await application.start()
         await application.updater.start_polling()
+
+        # Botun kapanmaması için sonsuz döngü
+        await asyncio.Event().wait()
 
     asyncio.run(main())

@@ -126,8 +126,8 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 import asyncio
 
-if __name__ == "__main__":
-TOKEN = os.getenv("TOKEN")
+    if __name__ == "__main__":
+        TOKEN = os.getenv("TOKEN")
     
     async def main():
         application = ApplicationBuilder().token(TOKEN).build()

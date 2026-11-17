@@ -124,16 +124,23 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(result_text, parse_mode="Markdown")
 
-if __name__ == '__main__':
-    TOKEN = "9256890366:AAEJ1hnynSyr7P7EICTYiqX5LNG7_RFiyas"
+import asyncio
+
+if __name__ == "__main__":
+    TOKEN = "9256890... (kendi token'ın burada kalsın)" # Zaten token'ın yazılı olan satır
     
-    application = ApplicationBuilder().token(TOKEN).build()
+    async def main():
+        application = ApplicationBuilder().token(TOKEN).build()
+        
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CommandHandler("bakiye", bakiye))
+        application.add_handler(CommandHandler("gunluk", gunluk))
+        application.add_handler(CommandHandler("iflasiyasa", iflasiyasa))
+        application.add_handler(CommandHandler("slot", play_slot))
+        
+        print("Ekonomili Slot Botu çalışıyor...")
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("bakiye", bakiye))
-    application.add_handler(CommandHandler("gunluk", gunluk))
-    application.add_handler(CommandHandler("iflasiyasa", iflasiyasa))
-    application.add_handler(CommandHandler("slot", play_slot))
-
-    print("Ekonomili Slot Botu çalışıyor...")
-    application.run_polling()
+    asyncio.run(main())

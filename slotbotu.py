@@ -127,7 +127,7 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 import asyncio
 
 if __name__ == "__main__":
-    TOKEN = os.getenv("9256890366:AAEJ1hnynSyr7P7EICTYiqX5LNG7_RFiyas") # Zaten token'ın yazılı olan satır
+TOKEN = os.getenv("TOKEN")
     
     async def main():
         application = ApplicationBuilder().token(TOKEN).build()

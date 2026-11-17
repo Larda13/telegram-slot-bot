@@ -112,8 +112,8 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(result_text, parse_mode="Markdown")
 
-if __name__ == "__main__":
-    TOKEN = os.getenv("TOKEN")
+    if __name__ == "__main__":
+        TOKEN = os.getenv("TOKEN")
     
     async def main():
         application = ApplicationBuilder().token(TOKEN).build()

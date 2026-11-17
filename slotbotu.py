@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import random
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
+# Loglama ayarları
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -14,9 +16,9 @@ user_data_db = {}
 
 # Telegram slot (🎰) kazanan değerleri ve çarpanları
 WINNING_VALUES = {
-    1: {"name": "🍫 ÜÇLÜ BAR", "multiplier": 5},     # Bahsin 5 katı
-    22: {"name": "🍇 ÜÇLÜ ÜZÜM", "multiplier": 10}, # Bahsin 10 katı
-    43: {"name": "🍋 ÜÇLÜ LİMON", "multiplier": 15},# Bahsin 15 katı
+    1: {"name": "🍒 ÜÇLÜ BAR", "multiplier": 5},      # Bahsin 5 katı
+    22: {"name": "🍇 ÜÇLÜ ÜZÜM", "multiplier": 10},  # Bahsin 10 katı
+    43: {"name": "🍋 ÜÇLÜ LİMON", "multiplier": 15}, # Bahsin 15 katı
     64: {"name": "🎰 JACKPOT (777)", "multiplier": 50} # Bahsin 50 katı
 }
 
@@ -30,81 +32,67 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     get_user(user.id)
     await update.message.reply_text(
-        f"🎰 **Slot Kumarhanesine Hoş Geldin, {user.first_name}!**\n\n"
-        f"💰 Başlangıç bakiyen: **100 Coin**\n"
-        f"🎮 Komutlar:\n"
-        f"• `/bakiye` - Cüzdanını kontrol et\n"
-        f"• `/slot [bahis]` - Slot çevir (Örn: `/slot 10`)\n"
-        f"• `/gunluk` - Günlük ücretsiz **100 Coin** al\n"
-        f"• `/iflasiyasa` - Parın bittiyse cüzi yardım al (30 Coin)",
+        f"Merhaba **{user.first_name}**! Ekonomili Slot Botuna hoş geldin. 🎰\n\n"
+        "Komutlar:\n"
+        "💰 /bakiye - Bakiyeni gösterir\n"
+        "🎁 /gunluk - Günlük 50 Coin alırsın\n"
+        "📉 /iflasiyasa - Bakiyen 0'lanınca 50 Coin destek alırsın\n"
+        "🎰 /slot [miktar] - Slot çevirirsin (Örn: /slot 10)",
         parse_mode="Markdown"
     )
 
 async def bakiye(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
-    await update.message.reply_text(f"💳 Cüzdanın: **{data['balance']} Coin** 🪙", parse_mode="Markdown")
+    await update.message.reply_text(f"💰 Güncel Bakiyen: **{data['balance']} Coin**", parse_mode="Markdown")
 
 async def gunluk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
-    
-    # Günlük ödülü 100 coin yaptık
-    data["balance"] += 100
-    await update.message.reply_text(
-        f"🎁 Günlük 100 Coin ödülün hesabına eklendi, **{user.first_name}**!\n"
-        f"💰 Yeni bakiyen: **{data['balance']} Coin** 🎉",
-        parse_mode="Markdown"
-    )
+    # Basitlik olması açısından direkt ekliyoruz
+    data['balance'] += 50
+    await update.message.reply_text(f"🎁 Günlük ödülün alındı! +50 Coin.\n💰 Yeni Bakiyen: **{data['balance']} Coin**", parse_mode="Markdown")
 
 async def iflasiyasa(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
-    
-    if data["balance"] > 20:
-        await update.message.reply_text("Eyvah! Paran henüz tamamen bitmemiş. Bakiyen 20 coin'in altındayken bu komutu kullanabilirsin.")
-        return
-    
-    # İflas yardım sandığı (30 coin)
-    data["balance"] += 30
-    await update.message.reply_text(
-        f"🚑 İflas yardım sandığından cüzi bir miktar (30 Coin) bağışlandı!\n"
-        f"💰 Yeni bakiyen: **{data['balance']} Coin**. Akıllı harca!",
-        parse_mode="Markdown"
-    )
+    if data['balance'] <= 0:
+        data['balance'] = 50
+        await update.message.reply_text("📉 İflas ettin ama devlet yardım eli uzattı! +50 Coin aldın.", parse_mode="Markdown")
+    else:
+        await update.message.reply_text("😎 Bakiyen bitmemiş ki, ne iflası! Zengin sayılırsın.", parse_mode="Markdown")
 
 async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     data = get_user(user.id)
-    
-    args = context.args
-    bet = 10
-    if args:
-        try:
-            bet = int(args[0])
-        except ValueError:
-            pass
-            
+
+    # Bahis miktarını kontrol et
+    if not context.args:
+        await update.message.reply_text("⚠️ Lütfen bir bahis miktarı gir. Örnek: `/slot 10`", parse_mode="Markdown")
+        return
+
+    try:
+        bet = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("⚠️ Lütfen geçerli bir sayı gir.", parse_mode="Markdown")
+        return
+
     if bet <= 0:
-        await update.message.reply_text("Geçersiz bahis miktarı!")
+        await update.message.reply_text("⚠️ Bahis 0'dan büyük olmalıdır.", parse_mode="Markdown")
         return
 
-    if data["balance"] < bet:
-        await update.message.reply_text(
-            f"❌ Yetersiz bakiye! Cüzdanında {data['balance']} Coin var.\n"
-            f"Yardım almak için `/iflasiyasa` yazabilirsin.",
-            parse_mode="Markdown"
-        )
+    if data['balance'] < bet:
+        await update.message.reply_text(f"❌ Yetersiz bakiye! Mevcut bakiyen: {data['balance']} Coin", parse_mode="Markdown")
         return
 
-    # Bahis ücretini hesaptan düş
-    data["balance"] -= bet
+    # Bakiyeden bahsi düş
+    data['balance'] -= bet
 
-    # Slot makinesini gönder
-    dice_message = await update.message.reply_dice(emoji="🎰")
-    slot_value = dice_message.dice.value
+    # Telegram'ın resmi animasyonlu slot zarını at
+    msg = await update.message.reply_dice(emoji="🎰")
+    slot_value = msg.dice.value
 
-    # Animasyonun durması için 2 saniye bekle
+    # Kısa bir bekleme (zar animasyonu tamamlansın diye)
     await asyncio.sleep(2)
 
     if slot_value in WINNING_VALUES:
@@ -124,10 +112,8 @@ async def play_slot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(result_text, parse_mode="Markdown")
 
-import asyncio
-
-    if __name__ == "__main__":
-        TOKEN = os.getenv("TOKEN")
+if __name__ == "__main__":
+    TOKEN = os.getenv("TOKEN")
     
     async def main():
         application = ApplicationBuilder().token(TOKEN).build()
